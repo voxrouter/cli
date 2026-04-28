@@ -5,8 +5,9 @@ on:
     tags:
       - "v*"
 
-# A failed release shouldn't be retried by accident — concurrency is keyed on
-# the tag so re-pushing the same tag (after a force-delete) re-runs once.
+# A failed release shouldn't have a second build racing against it. Tag-keyed
+# group so unrelated tags don't queue against each other; cancel-in-progress
+# is off so we don't kill a partially-uploaded release halfway through.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -55,21 +56,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Sync versions across 7 packages and source
+      - name: Sync version across 7 package.json files
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          # Meta package + 6 platform packages
+          # Meta package + 6 platform packages. The CLI source itself is
+          # version-agnostic — scripts/build.ts injects __VERSION__ via
+          # `bun build --define`, so the binary reports the tag's version
+          # without sed-rewriting committed source.
           for f in package.json npm-platforms/*/package.json; do
             tmp="$(mktemp)"
             jq --arg v "$VERSION" '.version = $v' "$f" > "$tmp"
             mv "$tmp" "$f"
           done
-          # CLI source — keep --version flag and self-update version aligned.
-          sed -i "s/^const VERSION = \".*\";/const VERSION = \"$VERSION\";/" src/commands/update.ts
-          sed -i "s/\.version(\"[^\"]*\")/.version(\"$VERSION\")/" src/index.ts
-          echo "Synced version $VERSION across packages and CLI source."
+          echo "Synced version $VERSION across 7 packages."
 
       - name: Build 6 platform binaries via Bun
         run: bun scripts/build.ts all
@@ -97,12 +98,25 @@ jobs:
         run: |
           set -euo pipefail
           # Copy install scripts into dist/ so the release exposes them as
-          # downloadable assets too (handy for offline mirrors and audits).
+          # downloadable assets too — voxrouter.ai/install fronts the
+          # latest-release copy of these.
           cp install.sh  dist/install.sh
           cp install.ps1 dist/install.ps1
+          # gh release create --notes does NOT interpret \n — use a heredoc.
+          cat > /tmp/release-notes.md <<EOF
+          Native binaries for darwin / linux / windows.
+
+          See \`manifest.json\` for SHA256 hashes.
+
+          ## Install
+
+          \`\`\`bash
+          curl -fsSL https://voxrouter.ai/install | bash
+          \`\`\`
+          EOF
           gh release create "$TAG" \
             --title "voxrouter CLI v$VERSION" \
-            --notes "Native binaries for darwin/linux/windows. See manifest.json for SHA256 hashes.\n\nInstall: \`curl -fsSL https://voxrouter.ai/install | bash\`" \
+            --notes-file /tmp/release-notes.md \
             --target "$GITHUB_SHA" \
             dist/manifest.json \
             dist/install.sh \

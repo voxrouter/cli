@@ -10,23 +10,23 @@ const REPO_ROOT = resolve(__dirname, "..");
 const ENTRY = resolve(REPO_ROOT, "src/index.ts");
 const OUT_DIR = resolve(REPO_ROOT, "dist");
 
-interface PlatformTarget {
-  /** Bun --target value. */
-  bunTarget: string;
-  /** Distribution platform key (used in manifest, GitHub Releases asset name, npm sub-package). */
-  platform: string;
-  /** Output binary file name (with .exe on Windows). */
-  binary: string;
-}
+// Distribution platform keys. bun --target and the output filename are both
+// derived from these — there's no per-target configuration that would justify
+// a struct.
+const PLATFORMS = [
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-arm64",
+  "linux-x64",
+  "linux-x64-musl",
+  "windows-x64",
+] as const;
 
-const TARGETS: readonly PlatformTarget[] = [
-  { bunTarget: "bun-darwin-arm64", platform: "darwin-arm64", binary: "voxrouter" },
-  { bunTarget: "bun-darwin-x64", platform: "darwin-x64", binary: "voxrouter" },
-  { bunTarget: "bun-linux-arm64", platform: "linux-arm64", binary: "voxrouter" },
-  { bunTarget: "bun-linux-x64", platform: "linux-x64", binary: "voxrouter" },
-  { bunTarget: "bun-linux-x64-musl", platform: "linux-x64-musl", binary: "voxrouter" },
-  { bunTarget: "bun-windows-x64", platform: "windows-x64", binary: "voxrouter.exe" },
-];
+type Platform = (typeof PLATFORMS)[number];
+
+const bunTarget = (p: Platform) => `bun-${p}` as const;
+const assetName = (p: Platform) =>
+  `voxrouter-${p}${p === "windows-x64" ? ".exe" : ""}`;
 
 function readVersion(): string {
   const pkg = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8")) as {
@@ -42,22 +42,22 @@ function sha256(filePath: string): string {
   return hash.digest("hex");
 }
 
-function selectTargets(): readonly PlatformTarget[] {
+function hostPlatform(): Platform {
+  if (process.platform === "win32") return "windows-x64";
+  const arch = process.arch === "arm64" ? "arm64" : "x64";
+  const candidate = `${process.platform}-${arch}`;
+  if ((PLATFORMS as readonly string[]).includes(candidate)) return candidate as Platform;
+  throw new Error(`No build target matches host platform ${candidate}.`);
+}
+
+function selectTargets(): readonly Platform[] {
   const filter = process.argv.slice(2).find((a) => !a.startsWith("--"));
-  if (!filter || filter === "all") return TARGETS;
-  if (filter === "host") {
-    const platform = process.platform === "win32" ? "windows-x64" : `${process.platform}-${process.arch === "arm64" ? "arm64" : "x64"}`;
-    const t = TARGETS.find((x) => x.platform === platform);
-    if (!t) throw new Error(`No target matches host platform ${platform}.`);
-    return [t];
-  }
-  const t = TARGETS.find((x) => x.platform === filter || x.bunTarget === filter);
-  if (!t) {
-    throw new Error(
-      `Unknown target "${filter}". Use "all", "host", or one of: ${TARGETS.map((x) => x.platform).join(", ")}.`,
-    );
-  }
-  return [t];
+  if (!filter || filter === "all") return PLATFORMS;
+  if (filter === "host") return [hostPlatform()];
+  if ((PLATFORMS as readonly string[]).includes(filter)) return [filter as Platform];
+  throw new Error(
+    `Unknown target "${filter}". Use "all", "host", or one of: ${PLATFORMS.join(", ")}.`,
+  );
 }
 
 function ensureSdkInstalled(): void {
@@ -78,27 +78,32 @@ function ensureSdkInstalled(): void {
   }
 }
 
-function buildOne(target: PlatformTarget): { path: string; size: number; sha256: string } {
-  const outPath = resolve(OUT_DIR, `voxrouter-${target.platform}${target.binary.endsWith(".exe") ? ".exe" : ""}`);
-  console.log(`\n→ Building ${target.platform} (${target.bunTarget})`);
+function buildOne(
+  platform: Platform,
+  version: string,
+): { file: string; size: number; sha256: string } {
+  const file = assetName(platform);
+  const outPath = resolve(OUT_DIR, file);
+  console.log(`\n→ Building ${platform}`);
   const args = [
     "build",
     "--compile",
-    `--target=${target.bunTarget}`,
+    `--target=${bunTarget(platform)}`,
     "--minify",
     "--sourcemap=none",
+    `--define=__VERSION__="${version}"`,
     ENTRY,
     "--outfile",
     outPath,
   ];
   const result = spawnSync("bun", args, { cwd: REPO_ROOT, stdio: "inherit" });
   if (result.status !== 0) {
-    throw new Error(`bun build failed for ${target.platform}`);
+    throw new Error(`bun build failed for ${platform}`);
   }
   const size = statSync(outPath).size;
   const digest = sha256(outPath);
   console.log(`  ${(size / 1024 / 1024).toFixed(1)} MB  sha256=${digest.slice(0, 12)}…`);
-  return { path: outPath, size, sha256: digest };
+  return { file, size, sha256: digest };
 }
 
 function main(): void {
@@ -117,14 +122,8 @@ function main(): void {
     binaries: {} as Record<string, { file: string; size: number; sha256: string }>,
   };
 
-  for (const t of targets) {
-    const out = buildOne(t);
-    const fileName = `voxrouter-${t.platform}${t.binary.endsWith(".exe") ? ".exe" : ""}`;
-    manifest.binaries[t.platform] = {
-      file: fileName,
-      size: out.size,
-      sha256: out.sha256,
-    };
+  for (const platform of targets) {
+    manifest.binaries[platform] = buildOne(platform, version);
   }
 
   const manifestPath = resolve(OUT_DIR, "manifest.json");

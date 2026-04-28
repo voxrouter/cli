@@ -4,9 +4,9 @@ import { chmodSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import type { Command } from "commander";
+import { VERSION } from "../version.js";
 
 const REPO = "voxrouter/cli";
-const VERSION = "0.1.0";
 
 interface UpdateOptions {
   json?: boolean;
@@ -128,6 +128,23 @@ export function updateCommand(program: Command): void {
     .option("--json", "Emit machine-readable output")
     .action(async (opts: UpdateOptions) => {
       const platform = detectPlatform();
+
+      // Decide upfront whether we can self-replace process.execPath. If we
+      // can't (npm install path, dev runs, renamed binary), bail out before
+      // any network round-trip — except when the user explicitly asked for
+      // --check, which is purely informational and should always answer.
+      const targetPath = locateRunningBinary();
+      if (!targetPath && !opts.check) {
+        const msg =
+          "Cannot self-update: process.execPath does not look like a voxrouter binary " +
+          `(${process.execPath}). ` +
+          "If you installed via npm, run `npm install -g @voxrouter/cli@latest` instead. " +
+          "Otherwise, reinstall via the standalone installer:\n" +
+          "  curl -fsSL https://voxrouter.ai/install | bash";
+        process.stderr.write(`${msg}\n`);
+        process.exit(2);
+      }
+
       const tag = opts.to
         ? `v${opts.to.replace(/^v/, "")}`
         : await fetchLatestTag();
@@ -156,19 +173,9 @@ export function updateCommand(program: Command): void {
         }
       }
 
-      const targetPath = locateRunningBinary();
+      // targetPath was checked at entry; narrow the type.
       if (!targetPath) {
-        // npm-installed CLI: the user runs the platform-specific binary
-        // through node bin.js, and process.execPath is node, not voxrouter.
-        // Self-update can't replace the binary without disturbing npm's
-        // package layout. Surface a clear next step instead.
-        const msg =
-          "Cannot self-update: this CLI was installed via npm. " +
-          "Run `npm install -g @voxrouter/cli@latest` instead, " +
-          "or use the standalone installer:\n" +
-          "  curl -fsSL https://voxrouter.ai/install | bash";
-        process.stderr.write(`${msg}\n`);
-        process.exit(2);
+        throw new Error("unreachable: targetPath should be set when applying update");
       }
 
       const manifest = await fetchManifest(tag);
@@ -195,5 +202,3 @@ export function updateCommand(program: Command): void {
     });
 }
 
-// Re-exported so the index.ts version flag stays in sync.
-export const CLI_VERSION = VERSION;

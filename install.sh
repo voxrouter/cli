@@ -169,16 +169,21 @@ main() {
   download "$manifest_url" "${tmp_dir}/manifest.json"
 
   local expected_sha256
-  # Inline JSON parse (avoid jq dep): grab "sha256":"..." for the matching platform key.
-  expected_sha256="$(
-    awk -v p="\"${platform}\"" '
-      $0 ~ p {found=1}
-      found && /"sha256"/ {
-        match($0, /"sha256"[ ]*:[ ]*"([0-9a-f]+)"/, m)
-        if (m[1]) { print m[1]; exit }
-      }
-    ' "${tmp_dir}/manifest.json"
-  )"
+  if command -v jq >/dev/null 2>&1; then
+    expected_sha256="$(jq -r ".binaries.\"${platform}\".sha256 // empty" "${tmp_dir}/manifest.json")"
+  else
+    # Fallback: positional awk parse, formatter-dependent. Preserves
+    # zero-dependency installs but breaks if anyone hand-edits manifest.json.
+    expected_sha256="$(
+      awk -v p="\"${platform}\"" '
+        $0 ~ p {found=1}
+        found && /"sha256"/ {
+          match($0, /"sha256"[ ]*:[ ]*"([0-9a-f]+)"/, m)
+          if (m[1]) { print m[1]; exit }
+        }
+      ' "${tmp_dir}/manifest.json"
+    )"
+  fi
   if [[ -z "$expected_sha256" ]]; then
     fail "manifest.json has no entry for platform ${platform}"
   fi
@@ -203,18 +208,13 @@ main() {
   ensure_on_path "${INSTALL_DIR}"
 
   ok "Installed ${binary_path}"
-  if [[ "$SKIP_PATH" != "1" ]]; then
-    case ":${PATH}:" in
-      *:"${INSTALL_DIR}":*)
-        info "Run \`voxrouter --help\` to get started."
-        ;;
-      *)
-        info "Added ${INSTALL_DIR} to your shell PATH (${BOLD}restart your shell${RESET} or run: export PATH=\"${INSTALL_DIR}:\$PATH\")"
-        ;;
-    esac
-  else
+  if [[ "$SKIP_PATH" == "1" ]]; then
     info "Skipped PATH editing. Add ${INSTALL_DIR} to your PATH manually."
+    return
   fi
+  # We just appended to the user's RC files; the running shell hasn't
+  # re-sourced them, so always tell the user to restart or source.
+  info "Added ${INSTALL_DIR} to your shell PATH. ${BOLD}Restart your shell${RESET} or run: export PATH=\"${INSTALL_DIR}:\$PATH\""
 }
 
 main "$@"

@@ -15,13 +15,14 @@ import { keysCommand } from "./commands/keys.js";
 import { billingCommand } from "./commands/billing.js";
 import { usageCommand } from "./commands/usage.js";
 import { updateCommand } from "./commands/update.js";
+import { VERSION } from "./version.js";
 
 const program = new Command();
 
 program
   .name("voxrouter")
   .description("Official CLI for the VoxRouter TTS API.")
-  .version("0.1.0")
+  .version(VERSION)
   .option(
     "--base-url <url>",
     "Override the API base URL (also reads VOXROUTER_BASE_URL).",
