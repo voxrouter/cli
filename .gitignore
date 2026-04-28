@@ -1,0 +1,8 @@
+dist/
+node_modules/
+*.tsbuildinfo
+.DS_Store
+
+# Per-platform binaries are populated at release time by CI.
+npm-platforms/*/voxrouter
+npm-platforms/*/voxrouter.exe

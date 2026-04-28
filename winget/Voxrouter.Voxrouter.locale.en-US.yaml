@@ -1,0 +1,26 @@
+PackageIdentifier: Voxrouter.Voxrouter
+PackageVersion: __VERSION__
+PackageLocale: en-US
+Publisher: VoxRouter
+PublisherUrl: https://voxrouter.ai
+PublisherSupportUrl: https://github.com/voxrouter/voxrouter/issues
+Author: VoxRouter
+PackageName: VoxRouter CLI
+PackageUrl: https://voxrouter.ai
+License: MIT
+LicenseUrl: https://github.com/voxrouter/voxrouter/blob/main/LICENSE
+Copyright: Copyright © VoxRouter
+ShortDescription: Official CLI for the VoxRouter TTS API
+Description: |
+  voxrouter is the official command-line interface for the VoxRouter TTS API.
+  It provides a thin, scriptable wrapper around the @voxrouter/sdk for both
+  human users and coding agents — with --json on every command and a stable
+  exit-code contract.
+Tags:
+  - cli
+  - tts
+  - voxrouter
+  - voice
+  - text-to-speech
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

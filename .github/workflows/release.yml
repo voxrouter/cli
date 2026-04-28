@@ -1,0 +1,151 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# A failed release shouldn't be retried by accident — concurrency is keyed on
+# the tag so re-pushing the same tag (after a force-delete) re-runs once.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write    # create GitHub Release, upload assets
+  id-token: write    # for npm provenance (future)
+
+jobs:
+  build-and-release:
+    name: Build and release ${{ github.ref_name }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          if [[ -z "$VERSION" || "$VERSION" == "$TAG" ]]; then
+            echo "::error::Tag $TAG does not match v* pattern"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Releasing voxrouter CLI v$VERSION"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.20
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync versions across 7 packages and source
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Meta package + 6 platform packages
+          for f in package.json npm-platforms/*/package.json; do
+            tmp="$(mktemp)"
+            jq --arg v "$VERSION" '.version = $v' "$f" > "$tmp"
+            mv "$tmp" "$f"
+          done
+          # CLI source — keep --version flag and self-update version aligned.
+          sed -i "s/^const VERSION = \".*\";/const VERSION = \"$VERSION\";/" src/commands/update.ts
+          sed -i "s/\.version(\"[^\"]*\")/.version(\"$VERSION\")/" src/index.ts
+          echo "Synced version $VERSION across packages and CLI source."
+
+      - name: Build 6 platform binaries via Bun
+        run: bun scripts/build.ts all
+
+      - name: Stage binaries into per-platform npm packages
+        run: |
+          set -euo pipefail
+          cp dist/voxrouter-darwin-arm64    npm-platforms/darwin-arm64/voxrouter
+          cp dist/voxrouter-darwin-x64      npm-platforms/darwin-x64/voxrouter
+          cp dist/voxrouter-linux-arm64     npm-platforms/linux-arm64/voxrouter
+          cp dist/voxrouter-linux-x64       npm-platforms/linux-x64/voxrouter
+          cp dist/voxrouter-linux-x64-musl  npm-platforms/linux-x64-musl/voxrouter
+          cp dist/voxrouter-windows-x64.exe npm-platforms/windows-x64/voxrouter.exe
+          chmod +x npm-platforms/darwin-arm64/voxrouter \
+                   npm-platforms/darwin-x64/voxrouter \
+                   npm-platforms/linux-arm64/voxrouter \
+                   npm-platforms/linux-x64/voxrouter \
+                   npm-platforms/linux-x64-musl/voxrouter
+
+      - name: Create GitHub Release with all assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Copy install scripts into dist/ so the release exposes them as
+          # downloadable assets too (handy for offline mirrors and audits).
+          cp install.sh  dist/install.sh
+          cp install.ps1 dist/install.ps1
+          gh release create "$TAG" \
+            --title "voxrouter CLI v$VERSION" \
+            --notes "Native binaries for darwin/linux/windows. See manifest.json for SHA256 hashes.\n\nInstall: \`curl -fsSL https://voxrouter.ai/install | bash\`" \
+            --target "$GITHUB_SHA" \
+            dist/manifest.json \
+            dist/install.sh \
+            dist/install.ps1 \
+            dist/voxrouter-darwin-arm64 \
+            dist/voxrouter-darwin-x64 \
+            dist/voxrouter-linux-arm64 \
+            dist/voxrouter-linux-x64 \
+            dist/voxrouter-linux-x64-musl \
+            dist/voxrouter-windows-x64.exe
+
+      - name: Publish per-platform npm packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          for platform in darwin-arm64 darwin-x64 linux-arm64 linux-x64 linux-x64-musl windows-x64; do
+            echo "→ Publishing @voxrouter/cli-$platform"
+            pnpm --filter "@voxrouter/cli-$platform" publish --no-git-checks --access public --tag latest
+          done
+
+      - name: Publish meta @voxrouter/cli package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # The meta package is published last so its optionalDependencies
+          # always resolve on npm. pnpm rewrites workspace:* to the matching
+          # version on publish; the previous step ensured those versions
+          # already exist on the registry.
+          pnpm --filter "@voxrouter/cli" publish --no-git-checks --access public --tag latest
+
+      - name: Summarize release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          {
+            echo "## voxrouter CLI v$VERSION released"
+            echo ""
+            echo "- GitHub Release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
+            echo "- npm: https://www.npmjs.com/package/@voxrouter/cli/v/$VERSION"
+            echo "- Install: \`curl -fsSL https://voxrouter.ai/install | bash\`"
+            echo ""
+            echo "### Follow-up (manual until automated):"
+            echo "- Update Homebrew formula in \`voxrouter/homebrew-tap\` (see \`homebrew/voxrouter.rb\`)"
+            echo "- Submit winget manifest update to microsoft/winget-pkgs (see \`winget/\`)"
+          } >> "$GITHUB_STEP_SUMMARY"

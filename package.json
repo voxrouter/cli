@@ -1,0 +1,53 @@
+{
+  "name": "@voxrouter/cli",
+  "version": "0.1.0",
+  "description": "Official CLI for the VoxRouter TTS API.",
+  "type": "module",
+  "bin": {
+    "voxrouter": "./bin.js"
+  },
+  "files": [
+    "bin.js",
+    "README.md",
+    "SKILL.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest"
+  },
+  "homepage": "https://voxrouter.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/voxrouter/cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/voxrouter/cli/issues"
+  },
+  "license": "MIT",
+  "scripts": {
+    "dev": "bun src/index.ts",
+    "build": "bun scripts/build.ts host",
+    "build:all": "bun scripts/build.ts all",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "optionalDependencies": {
+    "@voxrouter/cli-darwin-arm64": "workspace:*",
+    "@voxrouter/cli-darwin-x64": "workspace:*",
+    "@voxrouter/cli-linux-arm64": "workspace:*",
+    "@voxrouter/cli-linux-x64": "workspace:*",
+    "@voxrouter/cli-linux-x64-musl": "workspace:*",
+    "@voxrouter/cli-windows-x64": "workspace:*"
+  },
+  "devDependencies": {
+    "@voxrouter/sdk": "^1.0.0",
+    "@types/node": "^22.0.0",
+    "commander": "^12.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@voxrouter/cli-linux-arm64",
+  "version": "0.1.0",
+  "description": "VoxRouter CLI native binary for linux-arm64 (glibc). Installed via @voxrouter/cli; do not install directly.",
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "libc": ["glibc"],
+  "files": ["voxrouter"],
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest"
+  }
+}

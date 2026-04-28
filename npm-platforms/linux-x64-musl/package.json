@@ -1,0 +1,13 @@
+{
+  "name": "@voxrouter/cli-linux-x64-musl",
+  "version": "0.1.0",
+  "description": "VoxRouter CLI native binary for linux-x64 (musl/Alpine). Installed via @voxrouter/cli; do not install directly.",
+  "os": ["linux"],
+  "cpu": ["x64"],
+  "libc": ["musl"],
+  "files": ["voxrouter"],
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest"
+  }
+}

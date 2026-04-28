@@ -1,0 +1,13 @@
+PackageIdentifier: Voxrouter.Voxrouter
+PackageVersion: __VERSION__
+InstallerType: portable
+ReleaseDate: __RELEASE_DATE__
+Installers:
+  - Architecture: x64
+    InstallerType: portable
+    InstallerUrl: https://github.com/voxrouter/cli/releases/download/v__VERSION__/voxrouter-windows-x64.exe
+    InstallerSha256: __SHA256_WINDOWS_X64__
+    PortableCommandAlias:
+      - voxrouter
+ManifestType: installer
+ManifestVersion: 1.6.0

@@ -1,0 +1,12 @@
+{
+  "name": "@voxrouter/cli-darwin-x64",
+  "version": "0.1.0",
+  "description": "VoxRouter CLI native binary for darwin-x64. Installed via @voxrouter/cli; do not install directly.",
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "files": ["voxrouter"],
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest"
+  }
+}
