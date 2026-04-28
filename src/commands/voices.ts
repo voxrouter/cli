@@ -20,7 +20,10 @@ export function voicesCommand(program: Command): void {
     .option("--json", "Emit raw JSON instead of a table")
     .action(async (opts: VoicesOptions) => {
       const filter: VoicesFilter = {};
-      if (opts.provider) filter.provider = opts.provider;
+      if (opts.provider) {
+        // CLI flag is comma-separated for ergonomics; SDK takes string[].
+        filter.provider = opts.provider.split(",").map((s) => s.trim()).filter(Boolean);
+      }
       if (opts.language) filter.language = opts.language;
       if (opts.gender) filter.gender = opts.gender;
 

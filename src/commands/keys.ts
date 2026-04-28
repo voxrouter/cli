@@ -76,10 +76,10 @@ export function keysCommand(program: Command): void {
       // to stdout so users can pipe it (`voxrouter keys create ci | tee
       // .env`) without splicing the noise.
       process.stderr.write(
-        `\nKey created: ${created.name} (id ${created.id}, suffix ${created.keySuffix})\n` +
+        `\nKey created: ${created.key.name} (id ${created.key.id}, suffix ${created.key.keySuffix})\n` +
           `Save this value NOW — the API will never echo it again:\n\n`,
       );
-      process.stdout.write(`${created.keyValue}\n`);
+      process.stdout.write(`${created.secret}\n`);
     });
 
   keys

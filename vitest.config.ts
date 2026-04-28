@@ -1,6 +1,12 @@
-import { defineCoverageConfig } from "../../tools/testing/vitest-coverage";
+import { defineConfig } from "vitest/config";
 
-export default defineCoverageConfig({
-  testInclude: ["src/**/*.test.ts"],
-  coverageInclude: ["src/**/*.ts"],
+export default defineConfig({
+  test: {
+    include: ["src/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.test.ts"],
+    },
+  },
 });

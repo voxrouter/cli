@@ -12,8 +12,8 @@ importers:
         specifier: ^22.0.0
         version: 22.19.17
       '@voxrouter/sdk':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.1.0
+        version: 1.1.0
       commander:
         specifier: ^12.0.0
         version: 12.1.0
@@ -395,8 +395,8 @@ packages:
   '@vitest/utils@3.2.4':
     resolution: {integrity: sha512-fB2V0JFrQSMsCo9HiSq3Ezpdv4iYaXRG1Sx8edX3MwxfyNn83mKiGzOcH+Fkxt4MHxr3y42fQi1oeAInqgX2QA==}
 
-  '@voxrouter/sdk@1.0.0':
-    resolution: {integrity: sha512-YO4wJE/kjIhuPylPg+3mKeBzi9xXIjOXEF7oaESKfnKfv5YyoS4/jvo48MJ9gYW8yiB2lhWDl3jSU9LzvDZHIQ==}
+  '@voxrouter/sdk@1.1.0':
+    resolution: {integrity: sha512-F/8jin2/r3htH1LHyRZHR18OZoKkfhkhwIHiC9QoAD047w9Q54PNfXkvuNL8a1HUpmKvAtDFGzHNns1d/Xse+A==}
 
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
@@ -836,7 +836,7 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 2.0.0
 
-  '@voxrouter/sdk@1.0.0': {}
+  '@voxrouter/sdk@1.1.0': {}
 
   assertion-error@2.0.1: {}
 

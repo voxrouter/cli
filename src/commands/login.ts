@@ -38,7 +38,7 @@ export function loginCommand(program: Command): void {
       // Step 1: get a device-code pair from the API.
       let issuance;
       try {
-        issuance = await client.auth.deviceCode();
+        issuance = await client.auth.requestDeviceCode();
       } catch (err) {
         if (err instanceof VoxRouterError) {
           throw new CliError(
@@ -68,7 +68,7 @@ export function loginCommand(program: Command): void {
       const deadline = Date.now() + cliTimeout * 1000;
 
       while (Date.now() < deadline) {
-        const outcome = await client.auth.poll(issuance.device_code);
+        const outcome = await client.auth.pollDeviceCode(issuance.device_code);
 
         if (outcome.kind === "approved") {
           await writeConfig({

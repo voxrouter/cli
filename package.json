@@ -44,7 +44,7 @@
     "@voxrouter/cli-windows-x64": "workspace:*"
   },
   "devDependencies": {
-    "@voxrouter/sdk": "^1.0.0",
+    "@voxrouter/sdk": "^1.1.0",
     "@types/node": "^22.0.0",
     "commander": "^12.0.0",
     "typescript": "^5.0.0",

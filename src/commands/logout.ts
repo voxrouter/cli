@@ -30,11 +30,9 @@ export function logoutCommand(program: Command): void {
       // afterwards so a network error doesn't leave the user in a state
       // where the local config still has a token but the server has
       // already revoked it.
-      let serverRevoked = false;
       let serverError: string | null = null;
       try {
-        const result = await client.auth.logout();
-        serverRevoked = result.revoked;
+        await client.auth.logout();
       } catch (err) {
         if (err instanceof VoxRouterError) {
           serverError = `${err.code} (HTTP ${err.status})`;
@@ -58,7 +56,7 @@ export function logoutCommand(program: Command): void {
       }
 
       process.stderr.write(
-        `Logged out. ${serverRevoked ? "Session revoked server-side. " : ""}` +
+        `Logged out. Session revoked server-side. ` +
           `Local config removed (${configFilePath()}).\n`,
       );
     });

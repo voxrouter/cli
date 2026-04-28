@@ -20,15 +20,16 @@ export function billingCommand(program: Command): void {
 
   billing
     .command("balance")
-    .description("Show wallet snapshot. Alias for `voxrouter credits`.")
+    .description("Show wallet snapshot. Same wire endpoint as `voxrouter credits`.")
     .option("--json", "Emit raw JSON instead of a summary")
     .action(async (opts: JsonOption) => {
       const globals = program.opts<GlobalCliOptions>();
-      // Balance is data-plane (pk_*) — same as `voxrouter credits`.
-      // Living under the billing namespace is a discoverability win for
-      // first-time users who reach for `voxrouter billing` first.
+      // Balance is data-plane (pk_*) — same wire endpoint as
+      // `voxrouter credits`. Living under the billing namespace is a
+      // discoverability win for first-time users who reach for
+      // `voxrouter billing` first; under the hood it's `credits.get()`.
       const client = await makeClient(globals);
-      const wallet = await client.billing.getBalance();
+      const wallet = await client.credits.get();
 
       if (opts.json) {
         process.stdout.write(`${JSON.stringify(wallet, null, 2)}\n`);
@@ -113,7 +114,14 @@ export function billingCommand(program: Command): void {
         paymentMethodId = methods[0].id;
       }
 
-      const result = await client.billing.topup({ amountCents, paymentMethodId });
+      // SDK requires an idempotencyKey explicitly. The CLI is the
+      // outermost retry boundary — each topup invocation is one
+      // logical attempt, so a fresh UUID per invocation is correct.
+      const result = await client.billing.topup({
+        amountCents,
+        paymentMethodId,
+        idempotencyKey: crypto.randomUUID(),
+      });
 
       if (opts.json) {
         process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
