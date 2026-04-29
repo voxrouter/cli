@@ -41,8 +41,10 @@ export function loginCommand(program: Command): void {
         issuance = await client.auth.requestDeviceCode();
       } catch (err) {
         if (err instanceof VoxRouterError) {
+          // Server-side error during login start: runtime, not usage.
           throw new CliError(
             `Could not start login: ${err.code} (HTTP ${err.status})`,
+            1,
           );
         }
         throw err;
@@ -63,7 +65,8 @@ export function loginCommand(program: Command): void {
         ? Number.parseInt(opts.timeout, 10)
         : issuance.expires_in;
       if (!Number.isFinite(cliTimeout) || cliTimeout <= 0) {
-        throw new CliError("--timeout must be a positive integer");
+        // Bad flag value → usage error.
+        throw new CliError("--timeout must be a positive integer", 2);
       }
       const deadline = Date.now() + cliTimeout * 1000;
 
@@ -86,14 +89,21 @@ export function loginCommand(program: Command): void {
         }
 
         if (outcome.kind === "expired_token") {
+          // The user took too long to approve — runtime, not usage. The
+          // invocation was correct; the world (the user's attention)
+          // moved on.
           throw new CliError(
             "The device code expired before you approved it. Run `voxrouter login` again.",
+            1,
           );
         }
 
         if (outcome.kind === "invalid_device_code") {
+          // Server says our device code is invalid — that's a server-side
+          // surprise, runtime error.
           throw new CliError(
             "The server rejected our device code as invalid — this is a bug. Re-run `voxrouter login`.",
+            1,
           );
         }
 
@@ -101,8 +111,11 @@ export function loginCommand(program: Command): void {
         await sleep(intervalMs);
       }
 
+      // Same as expired_token: invocation was fine, the world ran out
+      // the clock. Runtime error.
       throw new CliError(
         "Timed out waiting for browser approval. Run `voxrouter login` again when ready.",
+        1,
       );
     });
 }

@@ -122,3 +122,35 @@ chmod 600 ci.key
 
 All commands accept `--json` for machine-readable output (suitable for
 piping into `jq`).
+
+### Provider-specific options
+
+`voxrouter speech` accepts `--provider-options <json>` for passthrough
+options the upstream provider supports but VoxRouter doesn't expose as
+typed flags. Shape depends on the provider; consult the provider adapter
+docs.
+
+```bash
+voxrouter speech "Hello" \
+  --voice EXAVITQu4vr4xnSDxMaL \
+  --model elevenlabs/eleven_turbo_v2_5 \
+  --provider-options '{"stability":0.65,"similarity_boost":0.8}' \
+  --out hello.mp3
+```
+
+The argument must be a JSON object. Arrays, primitives, and malformed
+JSON exit `2` (usage error) before any network call.
+
+## Exit codes
+
+Customer scripts can rely on this contract:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success. |
+| `1` | Runtime error — the network call failed, the server returned an error, or something unexpected went wrong mid-execution. Safe to retry the exact same invocation. |
+| `2` | Usage error — invalid flag, missing required argument, malformed input, or missing required env config (e.g. `VOXROUTER_API_KEY`). Do **not** retry without fixing the invocation. |
+| `130` | Interrupted by SIGINT (Ctrl-C). Standard POSIX convention. |
+
+The contract is enforced at the type level: the SDK exits with one of
+these codes deterministically — there's no "default 1" path.
