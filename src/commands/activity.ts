@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { LedgerEntry } from "@voxrouter/sdk";
 import { CliError, makeClient, type GlobalCliOptions } from "../lib/client.js";
-import { dollars, table } from "../lib/format.js";
+import { dollars, printList } from "../lib/format.js";
 
 interface ActivityOptions {
   limit?: string;
@@ -19,7 +19,7 @@ export function activityCommand(program: Command): void {
       if (opts.limit !== undefined) {
         const parsed = Number.parseInt(opts.limit, 10);
         if (!Number.isFinite(parsed) || parsed < 1 || parsed > 100) {
-          throw new CliError("--limit must be an integer between 1 and 100");
+          throw new CliError("--limit must be an integer between 1 and 100", 2);
         }
         limit = parsed;
       }
@@ -30,28 +30,18 @@ export function activityCommand(program: Command): void {
         limit !== undefined ? { limit } : undefined,
       );
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
-        return;
-      }
-
-      if (rows.length === 0) {
-        process.stdout.write("No ledger entries.\n");
-        return;
-      }
-
-      const tableRows = rows.map((r: LedgerEntry) => [
-        r.createdAt,
-        r.kind,
-        dollars(r.microsDelta),
-        dollars(r.microsBalanceAfter),
-        r.source,
-      ]);
-      process.stdout.write(
-        `${table(
-          ["CREATED", "KIND", "DELTA", "BALANCE AFTER", "SOURCE"],
-          tableRows,
-        )}\n`,
-      );
+      printList<LedgerEntry>({
+        rows,
+        json: Boolean(opts.json),
+        headers: ["CREATED", "KIND", "DELTA", "BALANCE AFTER", "SOURCE"],
+        project: (r) => [
+          r.createdAt,
+          r.kind,
+          dollars(r.microsDelta),
+          dollars(r.microsBalanceAfter),
+          r.source,
+        ],
+        empty: "No ledger entries.",
+      });
     });
 }

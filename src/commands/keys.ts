@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiKeySummary } from "@voxrouter/sdk";
 import { CliError, makeClient, type GlobalCliOptions } from "../lib/client.js";
-import { table } from "../lib/format.js";
+import { printJsonOr, printList } from "../lib/format.js";
 
 interface ListOptions {
   json?: boolean;
@@ -29,30 +29,20 @@ export function keysCommand(program: Command): void {
       const client = await makeClient(globals, { authMode: "session" });
       const list = await client.keys.list();
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(list, null, 2)}\n`);
-        return;
-      }
-
-      if (list.length === 0) {
-        process.stdout.write("No API keys.\n");
-        return;
-      }
-
-      const rows = list.map((k: ApiKeySummary) => [
-        k.id,
-        k.name,
-        k.keySuffix,
-        String(k.maxConcurrency),
-        k.createdAt,
-        k.lastUsedAt ?? "—",
-      ]);
-      process.stdout.write(
-        `${table(
-          ["ID", "NAME", "SUFFIX", "MAX CONC", "CREATED", "LAST USED"],
-          rows,
-        )}\n`,
-      );
+      printList<ApiKeySummary>({
+        rows: list,
+        json: Boolean(opts.json),
+        headers: ["ID", "NAME", "SUFFIX", "MAX CONC", "CREATED", "LAST USED"],
+        project: (k) => [
+          k.id,
+          k.name,
+          k.keySuffix,
+          String(k.maxConcurrency),
+          k.createdAt,
+          k.lastUsedAt ?? "—",
+        ],
+        empty: "No API keys.",
+      });
     });
 
   keys
@@ -61,25 +51,23 @@ export function keysCommand(program: Command): void {
     .option("--json", "Emit raw JSON instead of a human-readable summary")
     .action(async (name: string, opts: CreateOptions) => {
       if (!name || name.trim().length === 0) {
-        throw new CliError("name is required");
+        throw new CliError("name is required", 2);
       }
       const globals = program.opts<GlobalCliOptions>();
       const client = await makeClient(globals, { authMode: "session" });
       const created = await client.keys.create(name);
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(created, null, 2)}\n`);
-        return;
-      }
-
-      // Print to stderr the framing/instructions; the secret itself goes
-      // to stdout so users can pipe it (`voxrouter keys create ci | tee
-      // .env`) without splicing the noise.
-      process.stderr.write(
-        `\nKey created: ${created.key.name} (id ${created.key.id}, suffix ${created.key.keySuffix})\n` +
-          `Save this value NOW — the API will never echo it again:\n\n`,
-      );
-      process.stdout.write(`${created.secret}\n`);
+      // The secret-printing path is intentionally split across stderr and
+      // stdout, which doesn't fit the printJsonOr/printList shape — JSON
+      // mode dumps everything; text mode prints framing on stderr and the
+      // raw secret on stdout (so `voxrouter keys create ci > .env` works).
+      printJsonOr(Boolean(opts.json), created, () => {
+        process.stderr.write(
+          `\nKey created: ${created.key.name} (id ${created.key.id}, suffix ${created.key.keySuffix})\n` +
+            `Save this value NOW — the API will never echo it again:\n\n`,
+        );
+        process.stdout.write(`${created.secret}\n`);
+      });
     });
 
   keys
@@ -88,17 +76,14 @@ export function keysCommand(program: Command): void {
     .option("--json", "Emit raw JSON instead of a human-readable summary")
     .action(async (id: string, opts: DeleteOptions) => {
       if (!id || id.trim().length === 0) {
-        throw new CliError("id is required");
+        throw new CliError("id is required", 2);
       }
       const globals = program.opts<GlobalCliOptions>();
       const client = await makeClient(globals, { authMode: "session" });
-      const result = await client.keys.delete(id);
+      await client.keys.delete(id);
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-        return;
-      }
-
-      process.stdout.write(`Revoked ${id}.\n`);
+      printJsonOr(Boolean(opts.json), { deleted: true, id }, () => {
+        process.stdout.write(`Revoked ${id}.\n`);
+      });
     });
 }

@@ -7,7 +7,7 @@ type UsageProviderRow = UsageSummary["byProvider"][number];
 type UsageErrorRow = UsageSummary["byErrorCode"][number];
 type UsageRecentRow = UsageSummary["recent"][number];
 import { CliError, makeClient, type GlobalCliOptions } from "../lib/client.js";
-import { dollars, table } from "../lib/format.js";
+import { dollars, printJsonOr, table } from "../lib/format.js";
 
 interface UsageOptions {
   days?: string;
@@ -43,6 +43,7 @@ export function usageCommand(program: Command): void {
       if (view !== "provider" && view !== "error" && view !== "recent") {
         throw new CliError(
           "--by must be one of: provider, error, recent",
+          2,
         );
       }
 
@@ -55,12 +56,7 @@ export function usageCommand(program: Command): void {
         Object.keys(filter).length > 0 ? filter : undefined,
       );
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-        return;
-      }
-
-      printSummary(summary, view);
+      printJsonOr(Boolean(opts.json), summary, () => printSummary(summary, view));
     });
 }
 
@@ -73,7 +69,7 @@ function parseRange(
   if (raw === undefined) return undefined;
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n) || n < min || n > max) {
-    throw new CliError(`--${name} must be an integer between ${min} and ${max}`);
+    throw new CliError(`--${name} must be an integer between ${min} and ${max}`, 2);
   }
   return n;
 }
