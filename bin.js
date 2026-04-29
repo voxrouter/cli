@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { chmodSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -42,6 +43,18 @@ try {
       `Or use the standalone installer: curl -fsSL https://voxrouter.ai/install | bash\n`,
   );
   process.exit(1);
+}
+
+// pnpm publish doesn't always preserve chmod +x on Unix binaries inside the
+// tarball — re-mark executable on every launch. No-op on Windows; harmless
+// to repeat. The 0o755 here is the same mode the release CI sets at staging.
+if (process.platform !== "win32") {
+  try {
+    chmodSync(binPath, 0o755);
+  } catch {
+    // Read-only filesystems (npx temp dirs on some CI) — fall through and
+    // let spawnSync surface the EACCES if it really matters.
+  }
 }
 
 const result = spawnSync(binPath, process.argv.slice(2), { stdio: "inherit" });
