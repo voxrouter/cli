@@ -58,3 +58,33 @@ describe("writeConfig: bearer token file is never world-readable (postmortem #15
     expect(await readConfig()).toEqual(sample);
   });
 });
+
+describe("readConfig: malformed input is treated as not-logged-in, never throws", () => {
+  // Future-proofing: a config file written by a newer CLI carries a
+  // version this CLI doesn't understand. Treat as "no config" — the user
+  // gets the normal `voxrouter login` prompt rather than a crash.
+  it("returns null for an unknown version", async () => {
+    const cfgPath = configFilePath();
+    await fsp.mkdir(join(tmpHome, ".voxrouter"), { recursive: true, mode: 0o700 });
+    await fsp.writeFile(
+      cfgPath,
+      JSON.stringify({ ...sample, version: 99 }),
+      { mode: 0o600 },
+    );
+    expect(await readConfig()).toBeNull();
+  });
+
+  // Disk corruption / partial write / hand-edit gone wrong. Same
+  // contract: silently null, no throw.
+  it("returns null for non-JSON content", async () => {
+    const cfgPath = configFilePath();
+    await fsp.mkdir(join(tmpHome, ".voxrouter"), { recursive: true, mode: 0o700 });
+    await fsp.writeFile(cfgPath, "{ this is not json", { mode: 0o600 });
+    expect(await readConfig()).toBeNull();
+  });
+
+  // No file at all — the cold-start case after a fresh install.
+  it("returns null when the config file does not exist", async () => {
+    expect(await readConfig()).toBeNull();
+  });
+});
