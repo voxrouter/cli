@@ -63,6 +63,7 @@ export async function makeClient(
       throw new CliError(
         "VOXROUTER_API_KEY is not set. Export your API key, e.g.:\n" +
           "  export VOXROUTER_API_KEY=pk_...",
+        2,
       );
     }
   } else if (authMode === "session") {
@@ -72,6 +73,7 @@ export async function makeClient(
       throw new CliError(
         `Your CLI session has expired. Run \`voxrouter login\` again to refresh.\n` +
           `(config: ${configFilePath()})`,
+        2,
       );
     } else {
       // No login at all. Some session-mode endpoints (whoami) accept a
@@ -86,6 +88,7 @@ export async function makeClient(
         throw new CliError(
           "Not logged in. Run `voxrouter login` first.\n" +
             "(For pk_*-compatible commands, you can also export VOXROUTER_API_KEY.)",
+          2,
         );
       }
     }
@@ -114,9 +117,29 @@ export function resolveBaseUrl(globals: GlobalCliOptions): string | undefined {
   return globals.baseUrl ?? process.env.VOXROUTER_BASE_URL;
 }
 
+/** Process exit codes the CLI commits to.
+ *
+ *  - `0` — success.
+ *  - `1` — runtime error: a network call failed, the server returned an
+ *    error, or something unexpected went wrong mid-execution. Customer
+ *    scripts that branch on transient vs. fatal errors look here.
+ *  - `2` — usage error: the invocation itself is wrong (invalid flag,
+ *    missing required arg, malformed input, missing env config). Scripts
+ *    should NOT retry on this code.
+ *  - `130` — interrupted (SIGINT). Standard POSIX convention.
+ *
+ *  Any new throw site picks one and is explicit about which.
+ */
+export type CliExitCode = 1 | 2;
+
+/** Error thrown by command actions when the CLI itself can't proceed.
+ *
+ *  `exitCode` is REQUIRED on construction — every call site picks 1
+ *  (runtime) or 2 (usage) deliberately. There's no default; "I forgot
+ *  to think about it" is the bug we're trying to prevent. */
 export class CliError extends Error {
-  readonly exitCode: number;
-  constructor(message: string, exitCode = 1) {
+  readonly exitCode: CliExitCode;
+  constructor(message: string, exitCode: CliExitCode) {
     super(message);
     this.exitCode = exitCode;
   }
