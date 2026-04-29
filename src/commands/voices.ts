@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { Voice, VoicesFilter } from "@voxrouter/sdk";
 import { makeClient, type GlobalCliOptions } from "../lib/client.js";
-import { table } from "../lib/format.js";
+import { printList } from "../lib/format.js";
 
 interface VoicesOptions {
   provider?: string;
@@ -31,25 +31,18 @@ export function voicesCommand(program: Command): void {
       const client = await makeClient(globals);
       const voices = await client.voices.list(filter);
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(voices, null, 2)}\n`);
-        return;
-      }
-
-      if (voices.length === 0) {
-        process.stdout.write("No voices match these filters.\n");
-        return;
-      }
-
-      const rows = voices.map((v: Voice) => [
-        v.id,
-        v.provider,
-        v.name,
-        v.language,
-        v.labels.gender ?? "",
-      ]);
-      process.stdout.write(
-        `${table(["ID", "PROVIDER", "NAME", "LANGUAGE", "GENDER"], rows)}\n`,
-      );
+      printList<Voice>({
+        rows: voices,
+        json: Boolean(opts.json),
+        headers: ["ID", "PROVIDER", "NAME", "LANGUAGE", "GENDER"],
+        project: (v) => [
+          v.id,
+          v.provider,
+          v.name,
+          v.language,
+          v.labels.gender ?? "",
+        ],
+        empty: "No voices match these filters.",
+      });
     });
 }

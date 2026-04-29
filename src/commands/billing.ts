@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { SavedPaymentMethod } from "@voxrouter/sdk";
 import { CliError, makeClient, type GlobalCliOptions } from "../lib/client.js";
-import { dollars, table } from "../lib/format.js";
+import { dollars, printJsonOr, printList, printWallet } from "../lib/format.js";
 
 interface JsonOption {
   json?: boolean;
@@ -24,24 +24,13 @@ export function billingCommand(program: Command): void {
     .option("--json", "Emit raw JSON instead of a summary")
     .action(async (opts: JsonOption) => {
       const globals = program.opts<GlobalCliOptions>();
-      // Balance is data-plane (pk_*) — same wire endpoint as
-      // `voxrouter credits`. Living under the billing namespace is a
-      // discoverability win for first-time users who reach for
-      // `voxrouter billing` first; under the hood it's `credits.get()`.
+      // Same wire endpoint as `voxrouter credits` — the alias on the SDK
+      // was dropped in 1.1.0; the CLI alias remains because customers
+      // reaching for `voxrouter billing` first deserve to find balance
+      // there too. printWallet is the shared formatter.
       const client = await makeClient(globals);
       const wallet = await client.credits.get();
-
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(wallet, null, 2)}\n`);
-        return;
-      }
-
-      const available = wallet.balanceMicros - wallet.reservedMicros;
-      process.stdout.write(
-        `Balance:   ${dollars(wallet.balanceMicros)}\n` +
-          `Reserved:  ${dollars(wallet.reservedMicros)}\n` +
-          `Available: ${dollars(available)}\n`,
-      );
+      printWallet(wallet, Boolean(opts.json));
     });
 
   billing
@@ -53,27 +42,19 @@ export function billingCommand(program: Command): void {
       const client = await makeClient(globals, { authMode: "session" });
       const methods = await client.billing.listMethods();
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(methods, null, 2)}\n`);
-        return;
-      }
-
-      if (methods.length === 0) {
-        process.stdout.write(
-          "No saved payment methods.\nAdd one in the dashboard: https://voxrouter.ai/app/billing\n",
-        );
-        return;
-      }
-
-      const rows = methods.map((m: SavedPaymentMethod) => [
-        m.id,
-        m.brand,
-        `**** ${m.last4}`,
-        `${String(m.expMonth).padStart(2, "0")}/${m.expYear}`,
-      ]);
-      process.stdout.write(
-        `${table(["ID", "BRAND", "NUMBER", "EXPIRES"], rows)}\n`,
-      );
+      printList<SavedPaymentMethod>({
+        rows: methods,
+        json: Boolean(opts.json),
+        headers: ["ID", "BRAND", "NUMBER", "EXPIRES"],
+        project: (m) => [
+          m.id,
+          m.brand,
+          `**** ${m.last4}`,
+          `${String(m.expMonth).padStart(2, "0")}/${m.expYear}`,
+        ],
+        empty:
+          "No saved payment methods.\nAdd one in the dashboard: https://voxrouter.ai/app/billing",
+      });
     });
 
   billing
@@ -123,14 +104,12 @@ export function billingCommand(program: Command): void {
         idempotencyKey: crypto.randomUUID(),
       });
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-        return;
-      }
-      process.stdout.write(
-        `Charged ${dollars(amountCents * 1000)} (Stripe ${result.payment_intent_id}).\n` +
-          `The webhook will credit your wallet within a few seconds — check\n` +
-          `\`voxrouter billing balance\`.\n`,
-      );
+      printJsonOr(Boolean(opts.json), result, () => {
+        process.stdout.write(
+          `Charged ${dollars(amountCents * 1000)} (Stripe ${result.payment_intent_id}).\n` +
+            `The webhook will credit your wallet within a few seconds — check\n` +
+            `\`voxrouter billing balance\`.\n`,
+        );
+      });
     });
 }

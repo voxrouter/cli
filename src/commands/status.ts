@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ProviderHealth } from "@voxrouter/sdk";
 import { makeClient, type GlobalCliOptions } from "../lib/client.js";
-import { table } from "../lib/format.js";
+import { printList } from "../lib/format.js";
 
 interface StatusOptions {
   json?: boolean;
@@ -17,18 +17,12 @@ export function statusCommand(program: Command): void {
       const client = await makeClient(globals);
       const providers = await client.status.get();
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(providers, null, 2)}\n`);
-        return;
-      }
-
-      const rows = providers.map((p: ProviderHealth) => [
-        p.id,
-        p.state,
-        p.reason ?? "",
-      ]);
-      process.stdout.write(
-        `${table(["PROVIDER", "STATE", "REASON"], rows)}\n`,
-      );
+      printList<ProviderHealth>({
+        rows: providers,
+        json: Boolean(opts.json),
+        headers: ["PROVIDER", "STATE", "REASON"],
+        project: (p) => [p.id, p.state, p.reason ?? ""],
+        empty: "No providers reported.",
+      });
     });
 }

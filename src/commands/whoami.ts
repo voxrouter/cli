@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { makeClient, type GlobalCliOptions } from "../lib/client.js";
+import { printJsonOr } from "../lib/format.js";
 
 interface WhoamiOptions {
   json?: boolean;
@@ -19,20 +20,17 @@ export function whoamiCommand(program: Command): void {
       const client = await makeClient(globals, { authMode: "session" });
       const me = await client.auth.whoami();
 
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(me, null, 2)}\n`);
-        return;
-      }
-
-      const expiresLine =
-        me.expires_at !== undefined && me.expires_at !== null
-          ? `\nSession expires: ${me.expires_at}`
-          : "";
-      process.stdout.write(
-        `Authenticated as: ${me.user_id}\n` +
-          `Auth method:      ${me.auth}` +
-          expiresLine +
-          `\n`,
-      );
+      printJsonOr(Boolean(opts.json), me, () => {
+        const expiresLine =
+          me.expires_at !== undefined && me.expires_at !== null
+            ? `\nSession expires: ${me.expires_at}`
+            : "";
+        process.stdout.write(
+          `Authenticated as: ${me.user_id}\n` +
+            `Auth method:      ${me.auth}` +
+            expiresLine +
+            `\n`,
+        );
+      });
     });
 }
